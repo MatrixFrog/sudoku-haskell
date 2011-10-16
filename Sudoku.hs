@@ -90,12 +90,16 @@ solveRow row = map removeTaken row
 solveRows :: [[Cell]] -> [[Cell]]
 solveRows = map solveRow
 
-solvePass :: Board -> Board
-solvePass = (unrows . solveRows . rows) . (uncolumns . solveRows . columns) . (unsquares . solveRows . squares)
+naivePass :: Board -> Board
+naivePass = (unrows . solveRows . rows) . (uncolumns . solveRows . columns) . (unsquares . solveRows . squares)
+
+naiveSolve :: Board -> Board
+naiveSolve board =
+  let board' = naivePass board in
+    if board == board' then board' else naiveSolve board'
 
 solve :: Board -> Board
-solve board | solved board = board
-            | otherwise    = solve (solvePass board)
+solve = undefined
 
 verboseShow :: Board -> String
 verboseShow board = show (rows board) ++ "\n\n"
@@ -110,14 +114,20 @@ signature board = do
 
 getBoard1 :: IO Board
 getBoard1 = do
+  boards <- getBoards
+  return (boards !! 1)
+
+getBoards :: IO [Board]
+getBoards = do
   fileContents <- readFile "sudoku.txt"
-  let boards = parseBoards $ lines fileContents
-  let board1 = boards !! 1
-  return board1
+  return $ parseBoards (lines fileContents)
+
+naiveMain :: IO ()
+naiveMain = do
+  boards <- getBoards
+  print $ map naiveSolve boards
 
 main :: IO ()
 main = do
-  fileContents <- readFile "sudoku.txt"
-  let boards = parseBoards $ lines fileContents
+  boards <- getBoards
   print $ sum (map (fromJust . signature . solve) boards)
-
