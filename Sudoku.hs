@@ -1,10 +1,13 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 import Array ( Array
              , array
              , elems
              , (!))
+import Data.List (nub)
 import Data.Maybe (isJust, fromJust)
+import Debug.Trace (traceShow)
+
+-- set up the data structures
 
 newtype Cell = Cell {values :: [Int]} deriving (Eq)
 
@@ -49,6 +52,8 @@ parseBoards strings = b:bs
     b = strsToBoard (drop 1 bLines)
     bs = parseBoards bsLines
 
+-- deconstruct a board into rows/columns/squares
+
 rows, columns, squares :: Board -> [[Cell]]
 unrows, uncolumns, unsquares :: [[Cell]] -> Board
 
@@ -71,7 +76,9 @@ unsquares squareList = Board $ array ((0,0), (8,8)) alist
   where
     alist = [(squareCoords !! i !! j, squareList !! i !! j) | i <- [0..8], j <- [0..8]]
     squareCoords = [[(j,i) | i<-is, j<-js] | is <- sections, js <- sections]
-  
+
+-- solving
+    
 -- | takes a row/column/square and returns a list of all the numbers that are already taken
 taken :: [Cell] -> [Int]
 taken row = do
@@ -79,7 +86,6 @@ taken row = do
   n <- value cell
   return n
 
--- | Do as much solving as we can on a given row (or column or square)
 solveRow :: [Cell] -> [Cell]
 solveRow row = map removeTaken row
   where
@@ -87,19 +93,24 @@ solveRow row = map removeTaken row
     removeTaken cell = Cell $ filter (`notElem` takens) (values cell)
     takens = taken row
 
-solveRows :: [[Cell]] -> [[Cell]]
-solveRows = map solveRow
+pass :: ([Cell] -> [Cell]) -> Board -> Board
+pass f = (unrows . f' . rows) . (uncolumns . f' . columns) . (unsquares . f' . squares)
+  where f' = map f
 
-naivePass :: Board -> Board
-naivePass = (unrows . solveRows . rows) . (uncolumns . solveRows . columns) . (unsquares . solveRows . squares)
+solveWith :: ([Cell] -> [Cell]) -> Board -> Board
+solveWith f board = let board' = pass f board in
+  if board == board' then board' else solveWith f board'
 
 naiveSolve :: Board -> Board
-naiveSolve board =
-  let board' = naivePass board in
-    if board == board' then board' else naiveSolve board'
+naiveSolve = solveWith solveRow
+
+solveRow' :: [Cell] -> [Cell]
+solveRow' row = (traceShow unusedNums) row where
+  unfilled = filter (not . filled) row
+  unusedNums = nub $ concatMap values unfilled
 
 solve :: Board -> Board
-solve = undefined
+solve = solveWith solveRow'
 
 verboseShow :: Board -> String
 verboseShow board = show (rows board) ++ "\n\n"
