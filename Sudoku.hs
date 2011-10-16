@@ -3,9 +3,9 @@ import Array ( Array
              , array
              , elems
              , (!))
+import Control.Monad (forM_)
 import Data.List (nub, sort)
 import Data.Maybe (isJust, fromJust)
-import Debug.Trace (traceShow)
 
 -- set up the data structures
 
@@ -34,6 +34,9 @@ newtype Board = Board { contents :: (Array (Int,Int) Cell) } deriving (Eq)
 
 instance Show Board where
   show (Board a) = unlines [concat [smallshow (a ! (i,j)) | i <- [0..8]] | j <- [0..8]]
+
+verbosePrintBy :: (Board -> [[Cell]]) -> Board -> IO ()
+verbosePrintBy f board = forM_ (zip [1..] (f board)) print
 
 solved :: Board -> Bool
 solved board = and $ elems $ fmap filled $ contents board
@@ -143,9 +146,6 @@ solve :: Board -> Board
 solve board = let board' = twoStepSolve board in
   if board == board' then board' else solve board'
 
-verboseShow :: Board -> String
-verboseShow board = show (rows board) ++ "\n\n"
-
 signature :: Monad m => Board -> m Int
 signature board = do
   let arr = contents board
@@ -154,10 +154,10 @@ signature board = do
   c <- value (arr ! (2,0))
   return (100*a + 10*b + c)
 
-getBoard1 :: IO Board
-getBoard1 = do
+getBoard :: Int -> IO Board
+getBoard n = do
   boards <- getBoards
-  return (boards !! 1)
+  return $ boards !! (n-1)
 
 getBoards :: IO [Board]
 getBoards = do
