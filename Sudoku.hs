@@ -3,7 +3,7 @@ import Array ( Array
              , array
              , elems
              , (!))
-import Data.List (nub)
+import Data.List (nub, sort)
 import Data.Maybe (isJust, fromJust)
 import Debug.Trace (traceShow)
 
@@ -24,6 +24,11 @@ filled c = isJust (value c)
 value :: Monad m => Cell -> m Int
 value (Cell [x]) = return x
 value _          = fail "Cell does not have a definite value"
+
+canBe, cannotBe :: Cell -> Int -> Bool
+(Cell vals) `canBe` n = n `elem` vals
+
+c `cannotBe` n = not (c `canBe` n)
 
 newtype Board = Board { contents :: (Array (Int,Int) Cell) } deriving (Eq)
 
@@ -77,6 +82,14 @@ unsquares squareList = Board $ array ((0,0), (8,8)) alist
     alist = [(squareCoords !! i !! j, squareList !! i !! j) | i <- [0..8], j <- [0..8]]
     squareCoords = [[(j,i) | i<-is, j<-js] | is <- sections, js <- sections]
 
+-- checking solutions
+
+valid :: Board -> Bool
+valid board = solved board && all validRow (rows board)
+                           && all validRow (columns board)
+                           && all validRow (squares board)
+  where validRow row = sort (map value row) == map Just [1,2,3,4,5,6,7,8,9]
+
 -- solving
     
 -- | takes a row/column/square and returns a list of all the numbers that are already taken
@@ -105,12 +118,30 @@ naiveSolve :: Board -> Board
 naiveSolve = solveWith solveRow
 
 solveRow' :: [Cell] -> [Cell]
-solveRow' row = (traceShow unusedNums) row where
+solveRow' row = map solveCell row where
   unfilled = filter (not . filled) row
   unusedNums = nub $ concatMap values unfilled
 
+  solveCell :: Cell -> Cell
+  solveCell = foldr (.) id functionList
+
+  functionList :: [Cell -> Cell]
+  functionList = do
+    n <- unusedNums
+    let possibleNs = filter (`canBe` n) row :: [Cell]
+    case possibleNs of
+      [c] -> return (\cell -> if cell == c then Cell [n] else cell)
+      _ -> return id
+
+betterSolve :: Board -> Board
+betterSolve = solveWith solveRow'
+
+twoStepSolve :: Board -> Board
+twoStepSolve = betterSolve . naiveSolve
+
 solve :: Board -> Board
-solve = solveWith solveRow'
+solve board = let board' = twoStepSolve board in
+  if board == board' then board' else solve board'
 
 verboseShow :: Board -> String
 verboseShow board = show (rows board) ++ "\n\n"
